@@ -232,7 +232,7 @@
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">歸屬天數 Day</label>
-                            <select id="formDayNum" class="w-full px-3 py-2 text-xs bg-slate-100 dark:bg-slate-700 rounded-xl border-none focus:ring-2 focus:ring-sky-500 font-semibold">
+                            <select id="formDayNum" class="w-full px-3 py-2 text-xs bg-slate-100 dark:bg-slate-700 rounded-xl border-none focus:ring-2 focus:ring-sky-500 font-semibold" onchange="syncDateFromDaySelect(this.value)">
                                 <!-- Dynamic options -->
                             </select>
                         </div>
@@ -350,11 +350,11 @@
             </div>
         </div>
 
-        <!-- MODAL 4: SETTINGS & BACKUP MODAL -->
+        <!-- MODAL 4: SETTINGS MODAL -->
         <div id="settingsModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center hidden opacity-0 transition-opacity duration-200">
             <div class="bg-white dark:bg-slate-800 w-full max-w-md rounded-t-3xl sm:rounded-2xl p-5 space-y-4 shadow-2xl">
                 <div class="flex justify-between items-center border-b border-slate-100 dark:border-slate-700 pb-3">
-                    <h3 class="font-bold text-base">系統與備註設定 Settings</h3>
+                    <h3 class="font-bold text-base">系統與設定 Settings</h3>
                     <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600 p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
                 </div>
                 <div class="space-y-3">
@@ -375,6 +375,24 @@
                     </div>
 
                     <div class="pt-2 border-t border-slate-100 dark:border-slate-700 space-y-2">
+                        <button onclick="exportJSON()" class="w-full py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium text-xs rounded-xl hover:bg-slate-200 transition flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-download"></i>
+                            <span>匯出 JSON 備份 Export Backup</span>
+                        </button>
+                        <label class="w-full py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium text-xs rounded-xl hover:bg-slate-200 transition flex items-center justify-center space-x-2 cursor-pointer">
+                            <i class="fa-solid fa-upload"></i>
+                            <span>匯入 JSON 備份 Import Backup</span>
+                            <input type="file" accept=".json" onchange="importJSON(event)" class="hidden">
+                        </label>
+                        <button onclick="clearAllData()" class="w-full py-2 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-medium text-xs rounded-xl hover:bg-rose-100 transition flex items-center justify-center space-x-2 border border-rose-200 dark:border-rose-900/50">
+                            <i class="fa-solid fa-trash-can"></i>
+                            <span>清空所有紀錄 Clear Data</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- MODAL 5: SET BUDGET QUICK MODAL -->
         <div id="budgetModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center hidden opacity-0 transition-opacity duration-200">
             <div class="bg-white dark:bg-slate-800 w-full max-w-md rounded-t-3xl sm:rounded-2xl p-5 space-y-4 shadow-2xl">
@@ -411,13 +429,10 @@
         const CNY_EXCHANGE_RATE = 1.18; // 1 HKD = 1.18 CNY
         let currentBudget = null;
         let selectedDayFilter = 'ALL';
-        let activeCategoryFilter = 'ALL';
-        let activePaymentFilter = 'ALL';
 
         let categoryChartInstance = null;
         let dailyExpenseChartInstance = null;
 
-        // Default categories configuration
         const defaultCategories = [
             { name: "酒店", icon: "fa-hotel", color: "sky" },
             { name: "交通", icon: "fa-plane-departure", color: "indigo" },
@@ -427,7 +442,6 @@
             { name: "其他", icon: "fa-ellipsis", color: "slate" }
         ];
 
-        // Format money helper with CNY conversion option
         function convertAmount(hkdAmount) {
             const amount = parseFloat(hkdAmount) || 0;
             return currentCurrency === 'CNY' ? amount * CNY_EXCHANGE_RATE : amount;
@@ -438,7 +452,6 @@
             return `${currentCurrency} $${Number(converted).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
         }
 
-        // Show Toast Notification
         function showToast(message) {
             let toast = document.getElementById('toastNotification');
             if (!toast) {
@@ -455,64 +468,24 @@
             }, 2500);
         }
 
-        // Default initial preset expenses (Stored in base HKD)
         function getPresetExpenses(startDateStr) {
             const d1 = startDateStr || new Date().toISOString().slice(0, 10);
             return [
-                {
-                    id: "exp_1",
-                    date: d1,
-                    dayNum: 1,
-                    category: "酒店",
-                    title: "東京新宿飯店 3 晚預訂",
-                    amount: 3200,
-                    payer: "爸",
-                    payMethod: "Online",
-                    note: "Agoda 預先支付全額"
-                },
-                {
-                    id: "exp_2",
-                    date: d1,
-                    dayNum: 1,
-                    category: "交通",
-                    title: "成田特快 N'EX 來回車票",
-                    amount: 400,
-                    payer: "媽",
-                    payMethod: "Online",
-                    note: "Klook 購買"
-                },
-                {
-                    id: "exp_3",
-                    date: d1,
-                    dayNum: 1,
-                    category: "飲食",
-                    title: "機場拉麵午餐",
-                    amount: 120,
-                    payer: "妹",
-                    payMethod: "現金",
-                    note: "現場付日圓現金"
-                }
+                { id: "exp_1", date: d1, dayNum: 1, category: "酒店", title: "東京新宿飯店 3 晚預訂", amount: 3200, payer: "爸", payMethod: "Online", note: "Agoda 預先支付全額" },
+                { id: "exp_2", date: d1, dayNum: 1, category: "交通", title: "成田特快 N'EX 來回車票", amount: 400, payer: "媽", payMethod: "Online", note: "Klook 購買" },
+                { id: "exp_3", date: d1, dayNum: 1, category: "飲食", title: "機場拉麵午餐", amount: 120, payer: "妹", payMethod: "現金", note: "現場付日圓現金" }
             ];
         }
 
-        // Default initial preset itinerary
         function getPresetItinerary(startDateStr) {
             return [
                 { id: "itin_1", dayNum: 1, time: "10:00", title: "抵達機場 & 辦理入境", location: "成田國際機場 第一航廈", cost: 0, note: "前往 JR 窗口領取預訂車票" },
                 { id: "itin_2", dayNum: 1, time: "12:30", title: "飯店 Check-in 寄放行李", location: "新宿太陽道廣場飯店", cost: 0, note: "櫃檯可先寄存大件行李" },
                 { id: "itin_3", dayNum: 1, time: "13:30", title: "午算：伊勢丹百貨美食街", location: "新宿伊勢丹 B1", cost: 200, note: "品嚐人氣和牛便當" },
-                { id: "itin_4", dayNum: 1, time: "18:00", title: "晚餐：築地市場壽司", location: "築地場外市場", cost: 450, note: "現場現金支付" },
-                { id: "itin_5", dayNum: 2, time: "09:30", title: "淺草寺參拜 & 雷門散策", location: "東京都台東區淺草2-3-1", cost: 50, note: "購買御守與人形燒" },
-                { id: "itin_6", dayNum: 2, time: "15:00", title: "SHIBUYA SKY 展望台", location: "澀谷 Scramble Square 47F", cost: 280, note: "需出示 Klook 電子憑證 QR code" },
-                { id: "itin_7", dayNum: 3, time: "10:00", title: "明治神宮參觀", location: "原宿站出口", cost: 0, note: "漫步森林參道" },
-                { id: "itin_8", dayNum: 3, time: "14:00", title: "BicCamera 電器藥妝採購", location: "新宿西口店", cost: 2000, note: "記得出示 7%+10% 免稅優惠券" },
-                { id: "itin_9", dayNum: 4, time: "09:00", title: "富士山河口湖一日遊", location: "新宿高速巴士總站搭車", cost: 600, note: "車程約 2 小時，請提早 15 分鐘到場" },
-                { id: "itin_10", dayNum: 5, time: "11:00", title: "銀座逛街百貨購物", location: "GINZA SIX", cost: 1000, note: "午後下午茶" },
-                { id: "itin_11", dayNum: 6, time: "11:00", title: "飯店 Check-out 前往機場", location: "成田特快 N'EX 月台", cost: 0, note: "購買機場免稅店伴手禮" }
+                { id: "itin_4", dayNum: 1, time: "18:00", title: "晚餐：築地市場壽司", location: "築地場外市場", cost: 450, note: "現場現金支付" }
             ];
         }
 
-        // --- STORAGE & STATE FUNCTIONS ---
         function loadState() {
             try {
                 const storedTripConfig = localStorage.getItem('travel_trip_config');
@@ -540,33 +513,41 @@
                     saveItineraryToStorage();
                 }
             } catch (err) {
-                console.error("Error loading state from localStorage:", err);
+                console.error("Error loading state:", err);
                 expenses = getPresetExpenses();
                 itineraryItems = getPresetItinerary();
             }
         }
 
         function saveExpensesToStorage() {
-            try {
-                localStorage.setItem('travel_expenses', JSON.stringify(expenses));
-            } catch (e) {
-                console.error("Error saving expenses:", e);
-            }
+            try { localStorage.setItem('travel_expenses', JSON.stringify(expenses)); } catch (e) {}
         }
 
         function saveItineraryToStorage() {
-            try {
-                localStorage.setItem('travel_itinerary', JSON.stringify(itineraryItems));
-            } catch (e) {
-                console.error("Error saving itinerary:", e);
-            }
+            try { localStorage.setItem('travel_itinerary', JSON.stringify(itineraryItems)); } catch (e) {}
         }
 
-        // --- UI RENDER HELPERS ---
+        function getFilteredExpenses() {
+            if (selectedDayFilter === 'ALL') return expenses;
+            if (selectedDayFilter === 'DAY_0') return expenses.filter(x => x.dayNum === 0);
+            return expenses.filter(x => String(x.dayNum) === String(selectedDayFilter));
+        }
+
+        function getDateForDay(dayNum) {
+            const start = new Date(tripConfig.startDate);
+            if (dayNum === 0) return start.toISOString().slice(0, 10);
+            start.setDate(start.getDate() + (dayNum - 1));
+            return start.toISOString().slice(0, 10);
+        }
+
+        function syncDateFromDaySelect(dayVal) {
+            const dateInput = document.getElementById('formDate');
+            if (dateInput) dateInput.value = getDateForDay(parseInt(dayVal) || 1);
+        }
+
         function renderCategoryFormOptions() {
             const catSelect = document.getElementById('formCategory');
-            if (!catSelect) return;
-            catSelect.innerHTML = defaultCategories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+            if (catSelect) catSelect.innerHTML = defaultCategories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
         }
 
         function renderDayFilterBar() {
@@ -583,7 +564,7 @@
             `;
 
             for (let i = 1; i <= tripConfig.totalDays; i++) {
-                const isActive = selectedDayFilter === i || selectedDayFilter === String(i);
+                const isActive = String(selectedDayFilter) === String(i);
                 html += `
                     <button onclick="selectDayFilter(${i})" class="px-3 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition ${isActive ? 'bg-sky-500 text-white shadow-sm' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100'}">
                         Day ${i}
@@ -594,9 +575,7 @@
         }
 
         function updateCurrencyUI() {
-            document.querySelectorAll('.currentCurrencyCode').forEach(el => {
-                el.textContent = currentCurrency;
-            });
+            document.querySelectorAll('.currentCurrencyCode').forEach(el => el.textContent = currentCurrency);
             const sel = document.getElementById('currencySelect');
             if (sel) sel.value = currentCurrency;
         }
@@ -612,13 +591,12 @@
         }
 
         function renderDashboard() {
-            const filteredExpenses = getFilteredExpenses();
-            const totalSpentHKD = filteredExpenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+            const filtered = getFilteredExpenses();
+            const totalSpentHKD = filtered.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
 
             const totalSpentEl = document.getElementById('dashTotalSpent');
             if (totalSpentEl) totalSpentEl.textContent = formatMoney(totalSpentHKD);
 
-            // Render Budget UI
             const budgetWrapper = document.getElementById('budgetProgressWrapper');
             const dashBudgetText = document.getElementById('dashBudgetText');
             const dashBudgetRemaining = document.getElementById('dashBudgetRemaining');
@@ -647,13 +625,7 @@
 
                 if (dashProgressBar) {
                     dashProgressBar.style.width = `${percent}%`;
-                    if (percent >= 100) {
-                        dashProgressBar.className = "bg-rose-400 h-full rounded-full transition-all duration-500";
-                    } else if (percent >= 80) {
-                        dashProgressBar.className = "bg-amber-400 h-full rounded-full transition-all duration-500";
-                    } else {
-                        dashProgressBar.className = "bg-emerald-400 h-full rounded-full transition-all duration-500";
-                    }
+                    dashProgressBar.className = percent >= 100 ? "bg-rose-400 h-full rounded-full transition-all duration-500" : percent >= 80 ? "bg-amber-400 h-full rounded-full transition-all duration-500" : "bg-emerald-400 h-full rounded-full transition-all duration-500";
                 }
             } else {
                 if (budgetWrapper) budgetWrapper.classList.add('hidden');
@@ -662,7 +634,6 @@
 
             const rateBadge = document.getElementById('exchangeRateBadge');
             const equivHkdTotal = document.getElementById('equivHkdTotal');
-
             if (rateBadge && equivHkdTotal) {
                 if (currentCurrency === 'CNY') {
                     rateBadge.classList.remove('hidden');
@@ -672,20 +643,187 @@
                 }
             }
 
-            if (categoryChartInstance) {
-                updateChartData(filteredExpenses);
+            if (categoryChartInstance) updateChartData(filtered);
+            if (dailyExpenseChartInstance) updateDailyChartData(filtered);
+        }
+
+        // --- EXPENSE LIST RENDER ---
+        function renderExpenseList() {
+            const container = document.getElementById('expenseListContainer');
+            if (!container) return;
+            container.innerHTML = '';
+
+            let daysToRender = [];
+            if (selectedDayFilter === 'ALL') {
+                daysToRender.push(0);
+                for (let i = 1; i <= tripConfig.totalDays; i++) daysToRender.push(i);
+            } else if (selectedDayFilter === 'DAY_0') {
+                daysToRender = [0];
+            } else {
+                daysToRender = [parseInt(selectedDayFilter)];
             }
-            if (dailyExpenseChartInstance) {
-                updateDailyChartData(filteredExpenses);
+
+            let hasAny = false;
+
+            daysToRender.forEach(dayKey => {
+                const dayItems = expenses.filter(x => Number(x.dayNum) === Number(dayKey));
+                if (dayItems.length === 0) return;
+                hasAny = true;
+
+                const daySubtotal = dayItems.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+                const dayTitle = dayKey === 0 ? "行前準備 (Day 0)" : `Day ${dayKey}`;
+                const dateStr = getDateForDay(dayKey);
+
+                const section = document.createElement('div');
+                section.className = "bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-700 space-y-3";
+
+                let itemsHtml = dayItems.map(item => `
+                    <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-700/40 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700/70 transition">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 rounded-xl bg-sky-100 dark:bg-sky-900/50 text-sky-600 dark:text-sky-300 flex items-center justify-center font-bold text-xs shrink-0">
+                                ${item.category ? item.category.slice(0, 1) : '他'}
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-xs text-slate-800 dark:text-slate-100">${item.title}</h4>
+                                <p class="text-[10px] text-slate-400 space-x-1.5">
+                                    <span>${item.payer || ''}付</span>
+                                    <span>•</span>
+                                    <span>${item.payMethod || ''}</span>
+                                    ${item.note ? `<span>•</span><span>${item.note}</span>` : ''}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="font-black text-xs text-slate-800 dark:text-slate-100">${formatMoney(item.amount)}</span>
+                            <button onclick="editExpense('${item.id}')" class="p-1 text-slate-400 hover:text-sky-500 transition"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                            <button onclick="deleteExpense('${item.id}')" class="p-1 text-slate-400 hover:text-rose-500 transition"><i class="fa-solid fa-trash text-[10px]"></i></button>
+                        </div>
+                    </div>
+                `).join('');
+
+                section.innerHTML = `
+                    <div class="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-700">
+                        <div class="flex items-center space-x-2">
+                            <span class="font-bold text-xs text-slate-800 dark:text-slate-100">${dayTitle}</span>
+                            <span class="text-[10px] text-slate-400">${dateStr}</span>
+                        </div>
+                        <span class="text-xs font-bold text-sky-600 dark:text-sky-400">小計: ${formatMoney(daySubtotal)}</span>
+                    </div>
+                    <div class="space-y-2">${itemsHtml}</div>
+                `;
+                container.appendChild(section);
+            });
+
+            if (!hasAny) {
+                container.innerHTML = `
+                    <div class="text-center py-10 text-slate-400 space-y-2">
+                        <i class="fa-solid fa-receipt text-3xl opacity-40"></i>
+                        <p class="text-xs">尚無支出紀錄，點擊右上角「記一筆」新增</p>
+                    </div>
+                `;
             }
         }
 
-        // --- BUDGET MODAL LOGIC ---
+        // --- EXPENSE MODAL LOGIC ---
+        function populateExpenseDayOptions() {
+            const select = document.getElementById('formDayNum');
+            if (!select) return;
+            select.innerHTML = `<option value="0">Day 0 (行前)</option>`;
+            for (let i = 1; i <= tripConfig.totalDays; i++) {
+                select.innerHTML += `<option value="${i}">Day ${i}</option>`;
+            }
+        }
+
+        function openExpenseModal(editId = null) {
+            renderCategoryFormOptions();
+            populateExpenseDayOptions();
+            const modal = document.getElementById('expenseModal');
+            const titleEl = document.getElementById('expenseModalTitle');
+
+            if (editId) {
+                const item = expenses.find(x => String(x.id) === String(editId));
+                if (!item) return;
+                if (titleEl) titleEl.textContent = "編輯支出 Edit Expense";
+                document.getElementById('expenseId').value = item.id;
+                document.getElementById('formTitle').value = item.title;
+                document.getElementById('formAmount').value = item.amount;
+                document.getElementById('formCurrency').value = "HKD";
+                document.getElementById('formCategory').value = item.category || defaultCategories[0].name;
+                document.getElementById('formDayNum').value = item.dayNum || 1;
+                document.getElementById('formDate').value = item.date || getDateForDay(item.dayNum || 1);
+                document.getElementById('formPaidBy').value = item.payer || "妹";
+                document.getElementById('formPayMethod').value = item.payMethod || "Online";
+                document.getElementById('formNote').value = item.note || '';
+            } else {
+                if (titleEl) titleEl.textContent = "新增支出 Add Expense";
+                document.getElementById('expenseForm').reset();
+                document.getElementById('expenseId').value = '';
+                const defaultDay = typeof selectedDayFilter === 'number' ? selectedDayFilter : (selectedDayFilter === 'DAY_0' ? 0 : 1);
+                document.getElementById('formDayNum').value = defaultDay;
+                document.getElementById('formDate').value = getDateForDay(defaultDay);
+                document.getElementById('formCurrency').value = currentCurrency;
+            }
+
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+        }
+
+        function closeExpenseModal() {
+            const modal = document.getElementById('expenseModal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 200);
+        }
+
+        function saveExpense(e) {
+            e.preventDefault();
+            const id = document.getElementById('expenseId').value;
+            const title = document.getElementById('formTitle').value.trim();
+            const rawAmount = parseFloat(document.getElementById('formAmount').value) || 0;
+            const enteredCurrency = document.getElementById('formCurrency').value;
+            const hkdAmount = enteredCurrency === 'CNY' ? rawAmount / CNY_EXCHANGE_RATE : rawAmount;
+
+            const category = document.getElementById('formCategory').value;
+            const dayNum = parseInt(document.getElementById('formDayNum').value) || 0;
+            const date = document.getElementById('formDate').value;
+            const payer = document.getElementById('formPaidBy').value;
+            const payMethod = document.getElementById('formPayMethod').value;
+            const note = document.getElementById('formNote').value.trim();
+
+            if (id) {
+                const index = expenses.findIndex(x => String(x.id) === String(id));
+                if (index !== -1) {
+                    expenses[index] = { id, title, amount: hkdAmount, category, dayNum, date, payer, payMethod, note };
+                }
+            } else {
+                expenses.push({
+                    id: "exp_" + Date.now(),
+                    title, amount: hkdAmount, category, dayNum, date, payer, payMethod, note
+                });
+            }
+
+            saveExpensesToStorage();
+            renderDashboard();
+            renderExpenseList();
+            closeExpenseModal();
+            showToast(id ? "支出更新成功" : "新增支出成功");
+        }
+
+        function editExpense(id) { openExpenseModal(id); }
+
+        function deleteExpense(id) {
+            if (confirm("確定要刪除這筆支出嗎？")) {
+                expenses = expenses.filter(x => String(x.id) !== String(id));
+                saveExpensesToStorage();
+                renderDashboard();
+                renderExpenseList();
+                showToast("已刪除該筆支出");
+            }
+        }
+
+        // --- BUDGET MODALS ---
         function openBudgetModal() {
             const input = document.getElementById('quickBudgetInput');
-            if (input) {
-                input.value = currentBudget ? convertAmount(currentBudget).toFixed(0) : '';
-            }
+            if (input) input.value = currentBudget ? convertAmount(currentBudget).toFixed(0) : '';
             const modal = document.getElementById('budgetModal');
             modal.classList.remove('hidden');
             setTimeout(() => modal.classList.remove('opacity-0'), 10);
@@ -701,7 +839,6 @@
             e.preventDefault();
             const val = parseFloat(document.getElementById('quickBudgetInput').value);
             if (!isNaN(val) && val > 0) {
-                // Store in HKD base currency
                 currentBudget = currentCurrency === 'CNY' ? val / CNY_EXCHANGE_RATE : val;
                 localStorage.setItem('travel_budget', currentBudget);
                 showToast("預算已更新！");
@@ -736,12 +873,9 @@
             renderDashboard();
         }
 
-        // --- SETTINGS MODAL LOGIC ---
         function openSettingsModal() {
-            const settingsInput = document.getElementById('settingsBudgetInput');
-            if (settingsInput) {
-                settingsInput.value = currentBudget ? convertAmount(currentBudget).toFixed(0) : '';
-            }
+            const input = document.getElementById('settingsBudgetInput');
+            if (input) input.value = currentBudget ? convertAmount(currentBudget).toFixed(0) : '';
             const modal = document.getElementById('settingsModal');
             modal.classList.remove('hidden');
             setTimeout(() => modal.classList.remove('opacity-0'), 10);
@@ -753,309 +887,113 @@
             setTimeout(() => modal.classList.add('hidden'), 200);
         }
 
-        // --- ITINERARY TAB LOGIC ---
-        function renderItinerary() {
-            const container = document.getElementById('itineraryListContainer');
-            if (!container) return;
-            container.innerHTML = '';
-
-            let daysToRender = [];
-            if (selectedDayFilter === 'ALL') {
-                for (let i = 1; i <= tripConfig.totalDays; i++) daysToRender.push(i);
-            } else if (selectedDayFilter === 'DAY_0') {
-                daysToRender = [0];
-            } else {
-                daysToRender = [parseInt(selectedDayFilter)];
-            }
-
-            const start = new Date(tripConfig.startDate);
-
-            daysToRender.forEach(dayKey => {
-                let dateDisplayStr = "";
-                let dayTitleStr = `Day ${dayKey}`;
-
-                if (dayKey === 0) {
-                    dayTitleStr = "行前準備 (Day 0)";
-                } else if (tripConfig.startDate) {
-                    const currDate = new Date(start);
-                    currDate.setDate(currDate.getDate() + (dayKey - 1));
-                    dateDisplayStr = currDate.toISOString().slice(0, 10);
-                }
-
-                const dayItems = (itineraryItems || [])
-                    .filter(item => item.dayNum === dayKey)
-                    .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
-
-                const totalEstCost = dayItems.reduce((sum, item) => sum + (parseFloat(item.cost) || 0), 0);
-
-                const card = document.createElement('div');
-                card.className = "bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-700/60 space-y-3";
-
-                let headerHtml = `
-                    <div class="flex justify-between items-center pb-2.5 border-b border-slate-100 dark:border-slate-700">
-                        <div class="flex items-center space-x-2">
-                            <span class="px-2.5 py-1 bg-sky-500 text-white font-black text-xs rounded-xl shadow-sm">${dayTitleStr}</span>
-                            ${dateDisplayStr ? `<span class="text-xs text-slate-400 font-medium">${dateDisplayStr}</span>` : ''}
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            ${totalEstCost > 0 ? `<span class="text-xs text-slate-400 font-medium">預估: <strong class="text-slate-700 dark:text-slate-200">${formatMoney(totalEstCost)}</strong></span>` : ''}
-                            <button onclick="openItineraryModal(null, ${dayKey})" class="w-7 h-7 rounded-lg bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 flex items-center justify-center hover:bg-sky-100 transition" title="在此天新增項目">
-                                <i class="fa-solid fa-plus text-xs"></i>
-                            </button>
-                        </div>
-                    </div>
-                `;
-
-                let bodyHtml = "";
-                if (dayItems.length === 0) {
-                    bodyHtml = `
-                        <div class="text-center py-6 text-slate-400">
-                            <p class="text-xs">本日尚無安排行程活動</p>
-                            <button onclick="openItineraryModal(null, ${dayKey})" class="mt-2 text-xs text-sky-500 hover:underline font-medium">+ 新增第 ${dayKey} 天行程</button>
-                        </div>
-                    `;
-                } else {
-                    bodyHtml = `<div class="relative pl-3 border-l-2 border-sky-100 dark:border-sky-950 space-y-4 my-1">`;
-                    dayItems.forEach(item => {
-                        bodyHtml += `
-                            <div class="relative group">
-                                <div class="absolute -left-[19px] top-1 w-3 h-3 rounded-full bg-sky-500 border-2 border-white dark:border-slate-800 shadow"></div>
-                                <div class="bg-slate-50 dark:bg-slate-700/40 p-3 rounded-xl space-y-1 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition">
-                                    <div class="flex items-start justify-between">
-                                        <div class="flex items-center space-x-2">
-                                            <span class="text-xs font-black text-sky-600 dark:text-sky-400 bg-sky-100 dark:bg-sky-900/50 px-1.5 py-0.5 rounded">${item.time || '全天'}</span>
-                                            <h4 class="font-bold text-xs leading-tight text-slate-800 dark:text-slate-100">${item.title}</h4>
-                                        </div>
-                                        <div class="flex items-center space-x-1 shrink-0 ml-2">
-                                            <button onclick="editItineraryItem('${item.id}')" class="p-1 text-slate-400 hover:text-sky-500 transition">
-                                                <i class="fa-solid fa-pen text-[10px]"></i>
-                                            </button>
-                                            <button onclick="deleteItineraryItem('${item.id}')" class="p-1 text-slate-400 hover:text-rose-500 transition">
-                                                <i class="fa-solid fa-trash text-[10px]"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    ${item.location ? `
-                                        <div class="text-[11px] text-slate-500 dark:text-slate-400 flex items-center pt-0.5">
-                                            <i class="fa-solid fa-location-dot text-rose-500 mr-1.5 text-[10px]"></i>
-                                            <span class="truncate">${item.location}</span>
-                                        </div>
-                                    ` : ''}
-
-                                    ${item.cost > 0 ? `
-                                        <div class="text-[11px] text-slate-500 dark:text-slate-400 flex items-center">
-                                            <i class="fa-solid fa-coins text-amber-500 mr-1.5 text-[10px]"></i>
-                                            <span>預算花費: ${formatMoney(item.cost)}</span>
-                                        </div>
-                                    ` : ''}
-
-                                    ${item.note ? `
-                                        <div class="text-[10px] text-slate-400 bg-white/60 dark:bg-slate-800/60 p-1.5 rounded-lg border border-slate-100 dark:border-slate-700 mt-1">
-                                            <i class="fa-solid fa-circle-info mr-1 text-sky-400"></i>${item.note}
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            </div>
-                        `;
-                    });
-                    bodyHtml += `</div>`;
-                }
-
-                card.innerHTML = headerHtml + bodyHtml;
-                container.appendChild(card);
-            });
-        }
-
-        function populateItineraryModalDaySelect() {
-            const select = document.getElementById('itineraryFormDay');
-            if (!select) return;
-            select.innerHTML = '';
-
-            const start = new Date(tripConfig.startDate);
-            for (let i = 1; i <= tripConfig.totalDays; i++) {
-                const currDate = new Date(start);
-                currDate.setDate(currDate.getDate() + (i - 1));
-                const dateStr = currDate.toISOString().slice(0, 10);
-
-                const op = document.createElement('option');
-                op.value = i;
-                op.textContent = `Day ${i} (${dateStr})`;
-                select.appendChild(op);
-            }
-        }
-
-        function openItineraryModal(editId = null, preSelectDay = null) {
-            populateItineraryModalDaySelect();
-            const modal = document.getElementById('itineraryModal');
-            const form = document.getElementById('itineraryForm');
-
-            if (editId) {
-                const item = itineraryItems.find(x => x.id === editId);
-                if (!item) return;
-                document.getElementById('itineraryModalTitle').textContent = "編輯行程 Edit Activity";
-                document.getElementById('itineraryId').value = item.id;
-                document.getElementById('itineraryFormDay').value = item.dayNum;
-                document.getElementById('itineraryFormTime').value = item.time || "10:00";
-                document.getElementById('itineraryFormTitle').value = item.title;
-                document.getElementById('itineraryFormLocation').value = item.location || '';
-                document.getElementById('itineraryFormCost').value = item.cost || 0;
-                document.getElementById('itineraryFormNote').value = item.note || '';
-            } else {
-                document.getElementById('itineraryModalTitle').textContent = "新增行程 Add Activity";
-                form.reset();
-                document.getElementById('itineraryId').value = '';
-                document.getElementById('itineraryFormTime').value = "10:00";
-                
-                const defaultDay = preSelectDay || (typeof selectedDayFilter === 'number' ? selectedDayFilter : 1);
-                document.getElementById('itineraryFormDay').value = defaultDay;
-            }
-
+        function openTripModal() {
+            document.getElementById('tripStartDate').value = tripConfig.startDate;
+            document.getElementById('tripTotalDays').value = tripConfig.totalDays;
+            const modal = document.getElementById('tripModal');
             modal.classList.remove('hidden');
-            setTimeout(() => {
-                modal.classList.remove('opacity-0');
-            }, 10);
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
         }
 
-        function closeItineraryModal() {
-            const modal = document.getElementById('itineraryModal');
+        function closeTripModal() {
+            const modal = document.getElementById('tripModal');
             modal.classList.add('opacity-0');
             setTimeout(() => modal.classList.add('hidden'), 200);
         }
 
-        function saveItineraryItem(e) {
+        function saveTripConfig(e) {
             e.preventDefault();
-            const id = document.getElementById('itineraryId').value;
-            const dayNum = parseInt(document.getElementById('itineraryFormDay').value);
-            const time = document.getElementById('itineraryFormTime').value;
-            const title = document.getElementById('itineraryFormTitle').value.trim();
-            const location = document.getElementById('itineraryFormLocation').value.trim();
-            const cost = parseFloat(document.getElementById('itineraryFormCost').value) || 0;
-            const note = document.getElementById('itineraryFormNote').value.trim();
-
-            if (id) {
-                const index = itineraryItems.findIndex(x => x.id === id);
-                if (index !== -1) {
-                    itineraryItems[index] = { id, dayNum, time, title, location, cost, note };
-                }
-            } else {
-                const newItem = {
-                    id: "itin_" + Date.now(),
-                    dayNum, time, title, location, cost, note
-                };
-                itineraryItems.push(newItem);
-            }
-
-            saveItineraryToStorage();
-            renderItinerary();
-            closeItineraryModal();
-            showToast(id ? "行程更新成功" : "新增行程成功");
-        }
-
-        function editItineraryItem(id) {
-            openItineraryModal(id);
-        }
-
-        function deleteItineraryItem(id) {
-            if (confirm("確定要刪除這項行程嗎？")) {
-                itineraryItems = itineraryItems.filter(x => x.id !== id);
-                saveItineraryToStorage();
-                renderItinerary();
-                showToast("已刪除該行程");
-            }
-        }
-
-        function selectDayFilter(dayKey) {
-            selectedDayFilter = dayKey;
+            tripConfig.startDate = document.getElementById('tripStartDate').value;
+            tripConfig.totalDays = parseInt(document.getElementById('tripTotalDays').value) || 6;
+            localStorage.setItem('travel_trip_config', JSON.stringify(tripConfig));
             renderDayFilterBar();
             renderDashboard();
             renderItinerary();
             renderExpenseList();
+            closeTripModal();
+            showToast("旅程設定已儲存");
         }
 
-        // --- TAB SWITCHING ---
-        function switchTab(tabName) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
-
-            const navDash = document.getElementById('nav-dashboard');
-            const navItin = document.getElementById('nav-itinerary');
-            const navList = document.getElementById('nav-list');
-
-            const activeClass = "flex flex-col items-center py-1 px-4 text-sky-500 font-medium transition";
-            const inactiveClass = "flex flex-col items-center py-1 px-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-medium transition";
-
-            navDash.className = tabName === 'dashboard' ? activeClass : inactiveClass;
-            navItin.className = tabName === 'itinerary' ? activeClass : inactiveClass;
-            navList.className = tabName === 'list' ? activeClass : inactiveClass;
-        }
-
-        function exportJSON() {
-            const data = {
-                tripConfig,
-                currency: currentCurrency,
-                budget: currentBudget,
-                expenses,
-                itineraryItems
-            };
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = `Travel_Tracker_Backup_${new Date().toISOString().slice(0,10)}.json`;
-            link.click();
-            showToast("JSON 備份匯出成功");
-        }
-
-        function importJSON(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const data = JSON.parse(e.target.result);
-                    if (data.expenses && Array.isArray(data.expenses)) {
-                        expenses = data.expenses;
-                        if (data.itineraryItems) itineraryItems = data.itineraryItems;
-                        if (data.tripConfig) tripConfig = data.tripConfig;
-                        if (data.currency) currentCurrency = data.currency;
-                        if (data.budget) currentBudget = data.budget;
-
-                        saveExpensesToStorage();
-                        saveItineraryToStorage();
-                        localStorage.setItem('travel_trip_config', JSON.stringify(tripConfig));
-                        localStorage.setItem('travel_currency', currentCurrency);
-                        if (currentBudget) localStorage.setItem('travel_budget', currentBudget);
-
-                        updateCurrencyUI();
-                        renderDayFilterBar();
-                        renderDashboard();
-                        renderItinerary();
-                        renderExpenseList();
-                        closeSettingsModal();
-                        showToast("資料匯入成功！");
-                    } else {
-                        alert("無效的資料格式");
+        // --- CHARTS INITIALIZATION ---
+        function initCharts() {
+            const ctx1 = document.getElementById('categoryChart')?.getContext('2d');
+            if (ctx1) {
+                categoryChartInstance = new Chart(ctx1, {
+                    type: 'doughnut',
+                    data: { labels: [], datasets: [{ data: [], backgroundColor: ['#38bdf8', '#818cf8', '#fbbf24', '#34d399', '#c084fc', '#94a3b8'] }] },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 10 } } } }
                     }
-                } catch (err) {
-                    alert("檔案解析失敗，請確認是否為正確的 JSON 備份檔");
-                }
-            };
-            reader.readAsText(file);
+                });
+            }
+
+            const ctx2 = document.getElementById('dailyExpenseChart')?.getContext('2d');
+            if (ctx2) {
+                dailyExpenseChartInstance = new Chart(ctx2, {
+                    type: 'bar',
+                    data: { labels: [], datasets: [{ label: '每日支出', data: [], backgroundColor: '#38bdf8', borderRadius: 8 }] },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { y: { beginAtZero: true, grid: { color: 'rgba(148, 163, 184, 0.1)' } }, x: { grid: { display: false } } }
+                    }
+                });
+            }
+
+            renderDashboard();
         }
 
-        function clearAllData() {
-            if (confirm("警告：這將會清除所有紀錄與行程，此動作無法復原！確定要清空嗎？")) {
-                expenses = [];
-                itineraryItems = [];
-                saveExpensesToStorage();
-                saveItineraryToStorage();
-                renderDashboard();
-                renderItinerary();
-                renderExpenseList();
-                closeSettingsModal();
-                showToast("已清空所有紀錄");
+        function updateChartData(filteredList) {
+            if (!categoryChartInstance) return;
+            const catTotals = {};
+            let grandTotal = 0;
+
+            defaultCategories.forEach(c => catTotals[c.name] = 0);
+            filteredList.forEach(item => {
+                const converted = convertAmount(item.amount);
+                catTotals[item.category] = (catTotals[item.category] || 0) + converted;
+                grandTotal += converted;
+            });
+
+            const labels = [];
+            const data = [];
+            Object.keys(catTotals).forEach(cat => {
+                const val = catTotals[cat];
+                if (val > 0) {
+                    const pct = grandTotal > 0 ? ((val / grandTotal) * 100).toFixed(1) : 0;
+                    labels.push(`${cat} (${pct}%)`);
+                    data.push(val);
+                }
+            });
+
+            categoryChartInstance.data.labels = labels;
+            categoryChartInstance.data.datasets[0].data = data;
+            categoryChartInstance.update();
+        }
+
+        function updateDailyChartData(filteredList) {
+            if (!dailyExpenseChartInstance) return;
+            const daysLabels = ['Day 0'];
+            const dayTotals = [0];
+
+            for (let i = 1; i <= tripConfig.totalDays; i++) {
+                daysLabels.push(`Day ${i}`);
+                dayTotals.push(0);
             }
+
+            filteredList.forEach(item => {
+                const idx = item.dayNum || 0;
+                if (idx >= 0 && idx <= tripConfig.totalDays) {
+                    dayTotals[idx] += convertAmount(item.amount);
+                }
+            });
+
+            dailyExpenseChartInstance.data.labels = daysLabels;
+            dailyExpenseChartInstance.data.datasets[0].data = dayTotals;
+            dailyExpenseChartInstance.update();
         }
 
         // --- INITIALIZATION ---
@@ -1070,5 +1008,4 @@
             initCharts();
         };
     </script>
-</body>
-</html>
+<!-- ... existing code -->
