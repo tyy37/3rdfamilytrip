@@ -42,7 +42,7 @@
         <header class="sticky top-0 z-30 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center justify-between">
             <div class="flex items-center space-x-2">
                 <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-sky-500/20">
-                    <i class="fa-solid fa-[#plane-departure] text-sm">✈</i>
+                    <i class="fa-solid fa-plane-departure text-sm"></i>
                 </div>
                 <div>
                     <h1 class="font-bold text-sm leading-tight text-slate-900 dark:text-white">旅遊記帳 & 行程</h1>
@@ -190,15 +190,15 @@
             </section>
 
             <!-- TAB 3: EXPENSE LIST -->
-        <section id="tab-list" class="tab-content space-y-3 hidden">
-            <div class="flex items-center justify-between text-xs font-bold text-slate-500 dark:text-slate-400 px-1">
-                <span>支出明細列表 Expenses List</span>
-                <span class="text-[10px] text-slate-400 font-normal"><i class="fa-solid fa-arrows-up-down mr-1"></i>可調整排序 Reorder</span>
-            </div>
-            <div id="expenseListContainer" class="space-y-4">
-                <!-- Dynamic expense items grouped by day -->
-            </div>
-        </section>
+            <section id="tab-list" class="tab-content space-y-3 hidden">
+                <div class="flex items-center justify-between text-xs font-bold text-slate-500 dark:text-slate-400 px-1">
+                    <span>支出明細列表 Expenses List</span>
+                    <span class="text-[10px] text-slate-400 font-normal"><i class="fa-solid fa-arrows-up-down mr-1"></i>可調整排序 Reorder</span>
+                </div>
+                <div id="expenseListContainer" class="space-y-4">
+                    <!-- Dynamic expense items grouped by day -->
+                </div>
+            </section>
         </main>
 
         <!-- MODAL 1: ADD/EDIT EXPENSE MODAL -->
@@ -640,11 +640,37 @@
 
                 if (dashBudgetRemaining) {
                     if (remaining >= 0) {
+                        dashBudgetRemaining.textContent = `剩餘 ${formatMoney(remaining)}`;
+                        dashBudgetRemaining.className = "font-bold text-emerald-200";
+                    } else {
+                        dashBudgetRemaining.textContent = `超支 ${formatMoney(Math.abs(remaining))}`;
+                        dashBudgetRemaining.className = "font-bold text-rose-300";
+                    }
+                }
+
+                if (progressBar) {
+                    progressBar.style.width = `${percentage}%`;
+                    if (percentage >= 100) {
+                        progressBar.className = "bg-rose-500 h-full rounded-full transition-all duration-500";
+                    } else if (percentage >= 80) {
+                        progressBar.className = "bg-amber-400 h-full rounded-full transition-all duration-500";
+                    } else {
+                        progressBar.className = "bg-emerald-400 h-full rounded-full transition-all duration-500";
+                    }
+                }
+            } else {
+                if (budgetWrapper) budgetWrapper.classList.add('hidden');
+                if (setBudgetBtnText) setBudgetBtnText.textContent = "設定預算 Set Budget";
+            }
+
+            updateChartData(filteredExpenses);
+            updateDailyChartData(expenses);
+        }
+
         function renderPayerSummary(filteredList) {
             const container = document.getElementById('payerSummaryContainer');
             if (!container) return;
 
-            // Known default payers plus any custom payers present in expenses
             const defaultPayers = ["妹", "爸", "媽"];
             const payerTotals = {};
 
@@ -672,7 +698,6 @@
             const targetItem = expenses.find(x => String(x.id) === String(id));
             if (!targetItem) return;
 
-            // Get all items in the same day group
             const sameDayIndexes = [];
             expenses.forEach((item, index) => {
                 if (Number(item.dayNum) === Number(targetItem.dayNum)) {
@@ -689,7 +714,6 @@
             const globalIdx1 = sameDayIndexes[currentPosInDay];
             const globalIdx2 = sameDayIndexes[targetPosInDay];
 
-            // Swap positions in the main expenses array
             const temp = expenses[globalIdx1];
             expenses[globalIdx1] = expenses[globalIdx2];
             expenses[globalIdx2] = temp;
@@ -736,7 +760,6 @@
                     return `
                     <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-700/40 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700/70 transition">
                         <div class="flex items-center space-x-2.5">
-                            <!-- Move Up/Down controls -->
                             <div class="flex flex-col space-y-0.5 shrink-0">
                                 <button onclick="moveExpense('${item.id}', 'up')" ${isFirst ? 'disabled class="opacity-20 cursor-not-allowed text-slate-400"' : 'class="text-slate-400 hover:text-sky-500 transition"'}>
                                     <i class="fa-solid fa-chevron-up text-[10px]"></i>
@@ -746,7 +769,6 @@
                                 </button>
                             </div>
 
-                            <!-- Category Icon -->
                             <div class="w-8 h-8 rounded-xl bg-sky-100 dark:bg-sky-900/50 text-sky-600 dark:text-sky-300 flex items-center justify-center text-xs shrink-0 font-bold shadow-sm">
                                 <i class="fa-solid ${iconClass}"></i>
                             </div>
@@ -1066,18 +1088,6 @@
             dailyExpenseChartInstance.update();
         }
 
-        // --- INITIALIZATION ---
-        window.onload = function() {
-            loadState();
-            renderCategoryFormOptions();
-            renderDayFilterBar();
-            updateCurrencyUI();
-            renderDashboard();
-            renderItinerary();
-            renderExpenseList();
-            initCharts();
-        };
-
         // --- NAVIGATION & TAB SWITCHING ---
         function switchTab(tabName) {
             document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
@@ -1122,11 +1132,11 @@
                 return;
             }
             if (!val.includes(':')) {
-                if (val.length === 3) { // e.g. 930 -> 09:30
+                if (val.length === 3) {
                     val = '0' + val.slice(0, 1) + ':' + val.slice(1);
-                } else if (val.length === 4) { // e.g. 1430 -> 14:30
+                } else if (val.length === 4) {
                     val = val.slice(0, 2) + ':' + val.slice(2);
-                } else if (val.length === 1 || val.length === 2) { // e.g. 9 -> 09:00, 14 -> 14:00
+                } else if (val.length === 1 || val.length === 2) {
                     val = (val.length === 1 ? '0' + val : val) + ':00';
                 }
             }
@@ -1241,9 +1251,7 @@
                 if (items.length === 0) return;
                 hasAny = true;
 
-                // Calculate planned itinerary subtotal for this day
                 const dayPlannedSubtotal = items.reduce((sum, item) => sum + (parseFloat(item.cost) || 0), 0);
-
                 const dayTitle = dayKey === 0 ? "行前準備 (Day 0)" : `Day ${dayKey}`;
                 const dateStr = getDateForDay(dayKey);
 
@@ -1367,6 +1375,18 @@
                 showToast("所有資料已清空");
             }
         }
+
+        // --- INITIALIZATION ---
+        window.onload = function() {
+            loadState();
+            renderCategoryFormOptions();
+            renderDayFilterBar();
+            updateCurrencyUI();
+            renderDashboard();
+            renderItinerary();
+            renderExpenseList();
+            initCharts();
+        };
     </script>
 </body>
 </html>
