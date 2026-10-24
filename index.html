@@ -1007,5 +1007,270 @@
             renderExpenseList();
             initCharts();
         };
+
+        // --- NAVIGATION & TAB SWITCHING ---
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+            
+            const targetTab = document.getElementById(`tab-${tabName}`);
+            if (targetTab) targetTab.classList.remove('hidden');
+
+            const navs = ['dashboard', 'itinerary', 'list'];
+            navs.forEach(nav => {
+                const btn = document.getElementById(`nav-${nav}`);
+                if (btn) {
+                    if (nav === tabName) {
+                        btn.className = "flex flex-col items-center py-1 px-4 text-sky-500 font-medium transition";
+                    } else {
+                        btn.className = "flex flex-col items-center py-1 px-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-medium transition";
+                    }
+                }
+            });
+
+            if (tabName === 'dashboard') {
+                renderDashboard();
+            } else if (tabName === 'itinerary') {
+                renderItinerary();
+            } else if (tabName === 'list') {
+                renderExpenseList();
+            }
+        }
+
+        function selectDayFilter(dayKey) {
+            selectedDayFilter = dayKey;
+            renderDayFilterBar();
+            renderDashboard();
+            renderItinerary();
+            renderExpenseList();
+        }
+
+        // --- ITINERARY LOGIC ---
+        function populateItineraryDayOptions() {
+            const select = document.getElementById('itineraryFormDay');
+            if (!select) return;
+            select.innerHTML = `<option value="0">Day 0 (行前)</option>`;
+            for (let i = 1; i <= tripConfig.totalDays; i++) {
+                select.innerHTML += `<option value="${i}">Day ${i}</option>`;
+            }
+        }
+
+        function openItineraryModal(editId = null) {
+            populateItineraryDayOptions();
+            const modal = document.getElementById('itineraryModal');
+            const titleEl = document.getElementById('itineraryModalTitle');
+
+            if (editId) {
+                const item = itineraryItems.find(x => String(x.id) === String(editId));
+                if (!item) return;
+                if (titleEl) titleEl.textContent = "編輯行程 Edit Activity";
+                document.getElementById('itineraryId').value = item.id;
+                document.getElementById('itineraryFormDay').value = item.dayNum || 1;
+                document.getElementById('itineraryFormTime').value = item.time || "10:00";
+                document.getElementById('itineraryFormTitle').value = item.title || '';
+                document.getElementById('itineraryFormLocation').value = item.location || '';
+                document.getElementById('itineraryFormCost').value = item.cost ? convertAmount(item.cost) : '';
+                document.getElementById('itineraryFormNote').value = item.note || '';
+            } else {
+                if (titleEl) titleEl.textContent = "新增行程 Add Activity";
+                document.getElementById('itineraryForm').reset();
+                document.getElementById('itineraryId').value = '';
+                const defaultDay = typeof selectedDayFilter === 'number' ? selectedDayFilter : (selectedDayFilter === 'DAY_0' ? 0 : 1);
+                document.getElementById('itineraryFormDay').value = defaultDay;
+            }
+
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+        }
+
+        function closeItineraryModal() {
+            const modal = document.getElementById('itineraryModal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 200);
+        }
+
+        function saveItineraryItem(e) {
+            e.preventDefault();
+            const id = document.getElementById('itineraryId').value;
+            const dayNum = parseInt(document.getElementById('itineraryFormDay').value) || 0;
+            const time = document.getElementById('itineraryFormTime').value;
+            const title = document.getElementById('itineraryFormTitle').value.trim();
+            const location = document.getElementById('itineraryFormLocation').value.trim();
+            const rawCost = parseFloat(document.getElementById('itineraryFormCost').value) || 0;
+            const hkdCost = currentCurrency === 'CNY' ? rawCost / CNY_EXCHANGE_RATE : rawCost;
+            const note = document.getElementById('itineraryFormNote').value.trim();
+
+            if (id) {
+                const idx = itineraryItems.findIndex(x => String(x.id) === String(id));
+                if (idx !== -1) {
+                    itineraryItems[idx] = { id, dayNum, time, title, location, cost: hkdCost, note };
+                }
+            } else {
+                itineraryItems.push({
+                    id: "itin_" + Date.now(),
+                    dayNum, time, title, location, cost: hkdCost, note
+                });
+            }
+
+            saveItineraryToStorage();
+            renderItinerary();
+            closeItineraryModal();
+            showToast(id ? "行程更新成功" : "新增行程成功");
+        }
+
+        function editItineraryItem(id) { openItineraryModal(id); }
+
+        function deleteItineraryItem(id) {
+            if (confirm("確定要刪除這項行程嗎？")) {
+                itineraryItems = itineraryItems.filter(x => String(x.id) !== String(id));
+                saveItineraryToStorage();
+                renderItinerary();
+                showToast("已刪除該行程");
+            }
+        }
+
+        function renderItinerary() {
+            const container = document.getElementById('itineraryListContainer');
+            if (!container) return;
+            container.innerHTML = '';
+
+            let daysToRender = [];
+            if (selectedDayFilter === 'ALL') {
+                daysToRender.push(0);
+                for (let i = 1; i <= tripConfig.totalDays; i++) daysToRender.push(i);
+            } else if (selectedDayFilter === 'DAY_0') {
+                daysToRender = [0];
+            } else {
+                daysToRender = [parseInt(selectedDayFilter)];
+            }
+
+            let hasAny = false;
+
+            daysToRender.forEach(dayKey => {
+                const items = itineraryItems.filter(x => Number(x.dayNum) === Number(dayKey));
+                items.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+
+                if (items.length === 0) return;
+                hasAny = true;
+
+                const dayTitle = dayKey === 0 ? "行前準備 (Day 0)" : `Day ${dayKey}`;
+                const dateStr = getDateForDay(dayKey);
+
+                const section = document.createElement('div');
+                section.className = "bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-700 space-y-3";
+
+                let itemsHtml = items.map(item => `
+                    <div class="flex items-start justify-between p-2.5 bg-slate-50 dark:bg-slate-700/40 rounded-xl space-x-2">
+                        <div class="flex items-start space-x-2.5">
+                            <span class="text-xs font-bold px-2 py-0.5 bg-sky-100 dark:bg-sky-900/60 text-sky-600 dark:text-sky-300 rounded-lg shrink-0 mt-0.5">${item.time || '10:00'}</span>
+                            <div>
+                                <h4 class="font-bold text-xs text-slate-800 dark:text-slate-100">${item.title}</h4>
+                                ${item.location ? `<p class="text-[10px] text-slate-400 mt-0.5"><i class="fa-solid fa-location-dot mr-1"></i>${item.location}</p>` : ''}
+                                ${item.note ? `<p class="text-[10px] text-slate-400 mt-0.5">${item.note}</p>` : ''}
+                                ${item.cost ? `<p class="text-[11px] font-semibold text-amber-600 dark:text-amber-400 mt-1">預計花費: ${formatMoney(item.cost)}</p>` : ''}
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-1 shrink-0">
+                            <button onclick="editItineraryItem('${item.id}')" class="p-1 text-slate-400 hover:text-sky-500 transition"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                            <button onclick="deleteItineraryItem('${item.id}')" class="p-1 text-slate-400 hover:text-rose-500 transition"><i class="fa-solid fa-trash text-[10px]"></i></button>
+                        </div>
+                    </div>
+                `).join('');
+
+                section.innerHTML = `
+                    <div class="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-700">
+                        <span class="font-bold text-xs text-slate-800 dark:text-slate-100">${dayTitle} <span class="text-slate-400 text-[10px] ml-1">${dateStr}</span></span>
+                    </div>
+                    <div class="space-y-2">${itemsHtml}</div>
+                `;
+                container.appendChild(section);
+            });
+
+            if (!hasAny) {
+                container.innerHTML = `
+                    <div class="text-center py-10 text-slate-400 space-y-2">
+                        <i class="fa-solid fa-map-location-dot text-3xl opacity-40"></i>
+                        <p class="text-xs">尚無行程安排，點擊右上角「新增行程」加入景點</p>
+                    </div>
+                `;
+            }
+        }
+
+        // --- EXPORT / IMPORT / CLEAR BACKUP ---
+        function exportJSON() {
+            const data = {
+                tripConfig,
+                currentCurrency,
+                currentBudget,
+                expenses,
+                itineraryItems
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `travel_tracker_backup_${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast("備份檔已匯出");
+        }
+
+        function importJSON(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const data = JSON.parse(evt.target.result);
+                    if (data.tripConfig) {
+                        tripConfig = data.tripConfig;
+                        localStorage.setItem('travel_trip_config', JSON.stringify(tripConfig));
+                    }
+                    if (data.currentCurrency) {
+                        currentCurrency = data.currentCurrency;
+                        localStorage.setItem('travel_currency', currentCurrency);
+                    }
+                    if (data.currentBudget !== undefined) {
+                        currentBudget = data.currentBudget;
+                        if (currentBudget) localStorage.setItem('travel_budget', currentBudget);
+                        else localStorage.removeItem('travel_budget');
+                    }
+                    if (Array.isArray(data.expenses)) {
+                        expenses = data.expenses;
+                        saveExpensesToStorage();
+                    }
+                    if (Array.isArray(data.itineraryItems)) {
+                        itineraryItems = data.itineraryItems;
+                        saveItineraryToStorage();
+                    }
+                    renderDayFilterBar();
+                    updateCurrencyUI();
+                    renderDashboard();
+                    renderItinerary();
+                    renderExpenseList();
+                    closeSettingsModal();
+                    showToast("備份匯入成功！");
+                } catch (err) {
+                    alert("無效的 JSON 備份檔案 format");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function clearAllData() {
+            if (confirm("確定要清空所有旅程、支出與行程資料嗎？此動作無法復原！")) {
+                localStorage.removeItem('travel_expenses');
+                localStorage.removeItem('travel_itinerary');
+                localStorage.removeItem('travel_budget');
+                expenses = [];
+                itineraryItems = [];
+                currentBudget = null;
+                renderDashboard();
+                renderItinerary();
+                renderExpenseList();
+                closeSettingsModal();
+                showToast("所有資料已清空");
+            }
+        }
     </script>
-<!-- ... existing code -->
+</body>
+</html>
