@@ -101,11 +101,26 @@
                     <div class="absolute -right-4 -bottom-4 opacity-10 text-8xl font-black">
                         <i class="fa-solid fa-wallet"></i>
                     </div>
-                    <p class="text-xs text-sky-100 font-medium">目前累計總支出 Total Expense</p>
-                    <h2 class="text-2xl font-black mt-1" id="dashTotalSpent">HKD $0</h2>
-                    <div class="mt-3 pt-3 border-t border-white/20 flex justify-between items-center text-xs text-sky-100">
-                        <span id="dashBudgetText">預算未設定</span>
-                        <span id="dashBudgetRemaining"></span>
+                    <div class="flex justify-between items-start relative z-10">
+                        <div>
+                            <p class="text-xs text-sky-100 font-medium">目前累計總支出 Total Expense</p>
+                            <h2 class="text-2xl font-black mt-1" id="dashTotalSpent">HKD $0</h2>
+                        </div>
+                        <button onclick="openBudgetModal()" class="px-2.5 py-1 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white text-[11px] font-semibold rounded-lg transition flex items-center space-x-1 border border-white/20">
+                            <i class="fa-solid fa-piggy-bank text-[10px]"></i>
+                            <span id="setBudgetBtnText">設定預算 Set Budget</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Budget Progress Bar -->
+                    <div id="budgetProgressWrapper" class="mt-3 pt-3 border-t border-white/20 hidden">
+                        <div class="flex justify-between items-center text-xs text-sky-100 mb-1.5">
+                            <span id="dashBudgetText">預算: HKD $0</span>
+                            <span id="dashBudgetRemaining" class="font-bold"></span>
+                        </div>
+                        <div class="w-full bg-black/20 rounded-full h-2 overflow-hidden p-0.5">
+                            <div id="dashProgressBar" class="bg-emerald-400 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -351,24 +366,33 @@
                         </select>
                     </div>
 
-                    <div class="pt-2 border-t border-slate-100 dark:border-slate-700 space-y-2">
-                        <span class="block text-xs font-semibold text-slate-600 dark:text-slate-300">資料備份與還原 Backup & Data</span>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button onclick="exportJSON()" class="py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold hover:bg-slate-200 transition">
-                                <i class="fa-solid fa-download mr-1"></i>匯出 JSON 備份
-                            </button>
-                            <label class="py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold text-center cursor-pointer hover:bg-slate-200 transition">
-                                <i class="fa-solid fa-upload mr-1"></i>匯入 JSON
-                                <input type="file" accept=".json" onchange="importJSON(event)" class="hidden">
-                            </label>
-                        </div>
-                        <div class="pt-1">
-                            <button onclick="clearAllData()" class="w-full py-2 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 rounded-xl text-xs font-bold hover:bg-rose-100 transition">
-                                清空所有資料
-                            </button>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">總旅程預算 Trip Budget (<span class="currentCurrencyCode">HKD</span>)</label>
+                        <div class="flex space-x-2">
+                            <input type="number" id="settingsBudgetInput" min="0" placeholder="0 表示未設定" class="flex-1 px-3 py-2 text-xs bg-slate-100 dark:bg-slate-700 rounded-xl border-none font-bold">
+                            <button onclick="saveBudgetFromSettings()" class="px-3 py-2 bg-sky-500 text-white font-bold text-xs rounded-xl hover:bg-sky-600 transition">儲存</button>
                         </div>
                     </div>
+
+                    <div class="pt-2 border-t border-slate-100 dark:border-slate-700 space-y-2">
+        <!-- MODAL 5: SET BUDGET QUICK MODAL -->
+        <div id="budgetModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center hidden opacity-0 transition-opacity duration-200">
+            <div class="bg-white dark:bg-slate-800 w-full max-w-md rounded-t-3xl sm:rounded-2xl p-5 space-y-4 shadow-2xl">
+                <div class="flex justify-between items-center border-b border-slate-100 dark:border-slate-700 pb-3">
+                    <h3 class="font-bold text-base">設定總預算 Set Budget</h3>
+                    <button onclick="closeBudgetModal()" class="text-slate-400 hover:text-slate-600 p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
                 </div>
+                <form onsubmit="saveBudgetModal(event)" class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">預算金額 Budget Amount (<span class="currentCurrencyCode">HKD</span>)</label>
+                        <input type="number" id="quickBudgetInput" min="0" step="any" placeholder="例如：10000" class="w-full px-3 py-2 text-xs font-bold bg-slate-100 dark:bg-slate-700 rounded-xl border-none focus:ring-2 focus:ring-sky-500">
+                        <p class="text-[10px] text-slate-400 mt-1">輸入您這次旅遊預計花費的總上限，設為 0 可重置預算。</p>
+                    </div>
+                    <div class="flex space-x-2 pt-1">
+                        <button type="button" onclick="clearBudget()" class="w-1/3 py-2.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs rounded-xl hover:bg-slate-200 transition">清除預算</button>
+                        <button type="submit" class="w-2/3 py-2.5 bg-gradient-to-r from-sky-500 to-indigo-600 text-white font-bold text-xs rounded-xl shadow hover:from-sky-600 hover:to-indigo-700 transition">儲存預算 Save</button>
+                    </div>
+                </form>
             </div>
         </div>
 
@@ -594,6 +618,48 @@
             const totalSpentEl = document.getElementById('dashTotalSpent');
             if (totalSpentEl) totalSpentEl.textContent = formatMoney(totalSpentHKD);
 
+            // Render Budget UI
+            const budgetWrapper = document.getElementById('budgetProgressWrapper');
+            const dashBudgetText = document.getElementById('dashBudgetText');
+            const dashBudgetRemaining = document.getElementById('dashBudgetRemaining');
+            const dashProgressBar = document.getElementById('dashProgressBar');
+            const setBudgetBtnText = document.getElementById('setBudgetBtnText');
+
+            if (currentBudget && currentBudget > 0) {
+                const totalSpentDisplay = convertAmount(totalSpentHKD);
+                const budgetDisplay = convertAmount(currentBudget);
+                const remaining = budgetDisplay - totalSpentDisplay;
+                const percent = Math.min(Math.max((totalSpentDisplay / budgetDisplay) * 100, 0), 100);
+
+                if (budgetWrapper) budgetWrapper.classList.remove('hidden');
+                if (dashBudgetText) dashBudgetText.textContent = `預算: ${formatMoney(currentBudget)}`;
+                if (setBudgetBtnText) setBudgetBtnText.textContent = "修改預算";
+
+                if (dashBudgetRemaining) {
+                    if (remaining >= 0) {
+                        dashBudgetRemaining.textContent = `剩餘: ${formatMoney(remaining / (currentCurrency === 'CNY' ? CNY_EXCHANGE_RATE : 1))}`;
+                        dashBudgetRemaining.className = "font-bold text-emerald-300";
+                    } else {
+                        dashBudgetRemaining.textContent = `透支: ${formatMoney(Math.abs(remaining) / (currentCurrency === 'CNY' ? CNY_EXCHANGE_RATE : 1))}`;
+                        dashBudgetRemaining.className = "font-bold text-rose-300 animate-pulse";
+                    }
+                }
+
+                if (dashProgressBar) {
+                    dashProgressBar.style.width = `${percent}%`;
+                    if (percent >= 100) {
+                        dashProgressBar.className = "bg-rose-400 h-full rounded-full transition-all duration-500";
+                    } else if (percent >= 80) {
+                        dashProgressBar.className = "bg-amber-400 h-full rounded-full transition-all duration-500";
+                    } else {
+                        dashProgressBar.className = "bg-emerald-400 h-full rounded-full transition-all duration-500";
+                    }
+                }
+            } else {
+                if (budgetWrapper) budgetWrapper.classList.add('hidden');
+                if (setBudgetBtnText) setBudgetBtnText.textContent = "設定預算 Set Budget";
+            }
+
             const rateBadge = document.getElementById('exchangeRateBadge');
             const equivHkdTotal = document.getElementById('equivHkdTotal');
 
@@ -614,402 +680,68 @@
             }
         }
 
-        function renderExpenseList() {
-            const container = document.getElementById('expenseListContainer');
-            if (!container) return;
-            const filtered = getFilteredExpenses();
-
-            if (filtered.length === 0) {
-                container.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">沒有找到符合條件的支出項目</div>`;
-                return;
+        // --- BUDGET MODAL LOGIC ---
+        function openBudgetModal() {
+            const input = document.getElementById('quickBudgetInput');
+            if (input) {
+                input.value = currentBudget ? convertAmount(currentBudget).toFixed(0) : '';
             }
-
-            // Group expenses by dayNum
-            const groupedByDay = {};
-            filtered.forEach(exp => {
-                const dayKey = exp.dayNum ?? 1;
-                if (!groupedByDay[dayKey]) {
-                    groupedByDay[dayKey] = [];
-                }
-                groupedByDay[dayKey].push(exp);
-            });
-
-            // Sort days ascending
-            const sortedDays = Object.keys(groupedByDay).map(Number).sort((a, b) => a - b);
-            const start = new Date(tripConfig.startDate);
-
-            container.innerHTML = sortedDays.map(dayKey => {
-                const dayExpenses = groupedByDay[dayKey];
-                const daySubtotalHKD = dayExpenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-
-                let dateDisplayStr = "";
-                let dayTitleStr = `Day ${dayKey}`;
-
-                if (dayKey === 0) {
-                    dayTitleStr = "行前準備 (Day 0)";
-                } else if (tripConfig.startDate) {
-                    const currDate = new Date(start);
-                    currDate.setDate(currDate.getDate() + (dayKey - 1));
-                    dateDisplayStr = currDate.toISOString().slice(0, 10);
-                }
-
-                const itemsHtml = dayExpenses.map(exp => `
-                    <div class="bg-white dark:bg-slate-800 p-3 rounded-2xl border border-slate-100 dark:border-slate-700/60 shadow-sm flex items-center justify-between">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-9 h-9 rounded-xl bg-sky-50 dark:bg-sky-950/60 text-sky-500 flex items-center justify-center font-bold text-xs shrink-0">
-                                ${exp.category ? exp.category.charAt(0) : '費'}
-                            </div>
-                            <div>
-                                <div class="flex items-center space-x-2">
-                                    <h4 class="font-bold text-xs text-slate-800 dark:text-slate-100">${exp.title}</h4>
-                                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 font-medium">${exp.payer || '妹'}</span>
-                                </div>
-                                <div class="text-[11px] text-slate-400 flex items-center space-x-2 mt-0.5">
-                                    <span>${exp.payMethod || '現金'}</span>
-                                    ${exp.note ? `<span>•</span> <span class="truncate max-w-[120px]">${exp.note}</span>` : ''}
-                                </div>
-                            </div>
-                        </div>
-                        <div class="text-right shrink-0">
-                            <div class="font-bold text-xs text-slate-800 dark:text-slate-100">${formatMoney(exp.amount)}</div>
-                            <div class="flex justify-end space-x-1.5 mt-1">
-                                <button onclick="editExpense('${exp.id}')" class="text-slate-400 hover:text-sky-500 text-xs"><i class="fa-solid fa-pen"></i></button>
-                                <button onclick="deleteExpense('${exp.id}')" class="text-slate-400 hover:text-rose-500 text-xs"><i class="fa-solid fa-trash"></i></button>
-                            </div>
-                        </div>
-                    </div>
-                `).join('');
-
-                return `
-                    <div class="space-y-2">
-                        <div class="flex items-center justify-between bg-slate-200/60 dark:bg-slate-700/50 px-3 py-1.5 rounded-xl">
-                            <div class="flex items-center space-x-2">
-                                <span class="font-black text-xs text-slate-700 dark:text-slate-200">${dayTitleStr}</span>
-                                ${dateDisplayStr ? `<span class="text-[10px] text-slate-400 font-medium">(${dateDisplayStr})</span>` : ''}
-                            </div>
-                            <div class="text-xs font-bold text-sky-600 dark:text-sky-400">
-                                小計 Subtotal: ${formatMoney(daySubtotalHKD)}
-                            </div>
-                        </div>
-                        <div class="space-y-2">
-                            ${itemsHtml}
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function getFilteredExpenses() {
-            return (expenses || []).filter(item => {
-                if (selectedDayFilter !== 'ALL') {
-                    const d = selectedDayFilter === 'DAY_0' ? 0 : parseInt(selectedDayFilter);
-                    if (item.dayNum !== d) return false;
-                }
-                if (activeCategoryFilter !== 'ALL' && item.category !== activeCategoryFilter) return false;
-                if (activePaymentFilter !== 'ALL' && item.payMethod !== activePaymentFilter) return false;
-                return true;
-            });
-        }
-
-        function initCharts() {
-            const categoryCanvas = document.getElementById('categoryChart');
-            const dailyCanvas = document.getElementById('dailyExpenseChart');
-            if (typeof Chart === 'undefined') return;
-
-            const filtered = getFilteredExpenses();
-
-            // 1. Category Chart
-            if (categoryCanvas) {
-                const categorySums = {};
-                filtered.forEach(item => {
-                    const cat = item.category || '其他';
-                    categorySums[cat] = (categorySums[cat] || 0) + convertAmount(parseFloat(item.amount) || 0);
-                });
-
-                categoryChartInstance = new Chart(categoryCanvas, {
-                    type: 'doughnut',
-                    data: {
-                        labels: Object.keys(categorySums),
-                        datasets: [{
-                            data: Object.values(categorySums),
-                            backgroundColor: ['#0284c7', '#6366f1', '#f59e0b', '#10b981', '#a855f7', '#64748b']
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'bottom',
-                                labels: {
-                                    boxWidth: 12,
-                                    font: { size: 10 },
-                                    generateLabels: (chart) => {
-                                        const data = chart.data;
-                                        if (data.labels.length && data.datasets.length) {
-                                            const dataset = data.datasets[0];
-                                            const totalVal = dataset.data.reduce((acc, curr) => acc + curr, 0);
-                                            return data.labels.map((label, i) => {
-                                                const value = dataset.data[i] || 0;
-                                                const percentage = totalVal > 0 ? ((value / totalVal) * 100).toFixed(1) + '%' : '0%';
-                                                return {
-                                                    text: `${label}: ${percentage}`,
-                                                    fillStyle: dataset.backgroundColor[i],
-                                                    hidden: isNaN(dataset.data[i]) || chart.getDatasetMeta(0).data[i].hidden,
-                                                    index: i
-                                                };
-                                            });
-                                        }
-                                        return [];
-                                    }
-                                }
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        const value = context.raw || 0;
-                                        const totalVal = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
-                                        const percentage = totalVal > 0 ? ((value / totalVal) * 100).toFixed(1) + '%' : '0%';
-                                        return ` ${context.label}: ${currentCurrency} $${value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} (${percentage})`;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-            }
-
-            // 2. Daily Expense Chart
-            if (dailyCanvas) {
-                const dailyData = getDailyExpenseData(filtered);
-
-                dailyExpenseChartInstance = new Chart(dailyCanvas, {
-                    type: 'bar',
-                    data: {
-                        labels: dailyData.labels,
-                        datasets: [{
-                            label: '支出金額 Amount',
-                            data: dailyData.values,
-                            backgroundColor: '#38bdf8',
-                            borderRadius: 6
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { display: false },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        return ` 支出: ${currentCurrency} $${Number(context.raw).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            x: {
-                                grid: { display: false },
-                                ticks: { font: { size: 10 } }
-                            },
-                            y: {
-                                beginAtZero: true,
-                                ticks: { font: { size: 10 } }
-                            }
-                        }
-                    }
-                });
-            }
-        }
-
-        function getDailyExpenseData(filtered) {
-            const labels = ['Day 0'];
-            for (let i = 1; i <= tripConfig.totalDays; i++) {
-                labels.push(`Day ${i}`);
-            }
-
-            const sums = new Array(tripConfig.totalDays + 1).fill(0);
-            filtered.forEach(item => {
-                const dayIndex = typeof item.dayNum === 'number' ? item.dayNum : 0;
-                if (dayIndex >= 0 && dayIndex <= tripConfig.totalDays) {
-                    sums[dayIndex] += convertAmount(parseFloat(item.amount) || 0);
-                }
-            });
-
-            return { labels, values: sums };
-        }
-
-        function updateChartData(filtered) {
-            if (!categoryChartInstance) return;
-            const categorySums = {};
-            filtered.forEach(item => {
-                const cat = item.category || '其他';
-                categorySums[cat] = (categorySums[cat] || 0) + convertAmount(parseFloat(item.amount) || 0);
-            });
-            categoryChartInstance.data.labels = Object.keys(categorySums);
-            categoryChartInstance.data.datasets[0].data = Object.values(categorySums);
-            categoryChartInstance.update();
-        }
-
-        function updateDailyChartData(filtered) {
-            if (!dailyExpenseChartInstance) return;
-            const dailyData = getDailyExpenseData(filtered);
-            dailyExpenseChartInstance.data.labels = dailyData.labels;
-            dailyExpenseChartInstance.data.datasets[0].data = dailyData.values;
-            dailyExpenseChartInstance.update();
-        }
-
-        // --- EXPENSE MODAL LOGIC ---
-        function populateExpenseModalDaySelect() {
-            const select = document.getElementById('formDayNum');
-            if (!select) return;
-            select.innerHTML = '';
-
-            const op0 = document.createElement('option');
-            op0.value = 0;
-            op0.textContent = "Day 0 (行前)";
-            select.appendChild(op0);
-
-            const start = new Date(tripConfig.startDate);
-            for (let i = 1; i <= tripConfig.totalDays; i++) {
-                const currDate = new Date(start);
-                currDate.setDate(currDate.getDate() + (i - 1));
-                const dateStr = currDate.toISOString().slice(0, 10);
-
-                const op = document.createElement('option');
-                op.value = i;
-                op.textContent = `Day ${i} (${dateStr})`;
-                select.appendChild(op);
-            }
-        }
-
-        function openExpenseModal(editId = null) {
-            populateExpenseModalDaySelect();
-            const modal = document.getElementById('expenseModal');
-            const form = document.getElementById('expenseForm');
-
-            if (editId) {
-                const item = expenses.find(x => String(x.id) === String(editId));
-                if (!item) return;
-                document.getElementById('expenseModalTitle').textContent = "編輯支出 Edit Expense";
-                document.getElementById('expenseId').value = item.id;
-                document.getElementById('formTitle').value = item.title || '';
-                
-                // Show amount in HKD or CNY based on current selection
-                if (currentCurrency === 'CNY') {
-                    document.getElementById('formAmount').value = (item.amount * CNY_EXCHANGE_RATE).toFixed(2);
-                    document.getElementById('formCurrency').value = 'CNY';
-                } else {
-                    document.getElementById('formAmount').value = item.amount ?? '';
-                    document.getElementById('formCurrency').value = 'HKD';
-                }
-
-                document.getElementById('formCategory').value = item.category || defaultCategories[0].name;
-                document.getElementById('formDayNum').value = item.dayNum ?? 1;
-                document.getElementById('formDate').value = item.date || tripConfig.startDate;
-                document.getElementById('formPaidBy').value = item.payer || '妹';
-                document.getElementById('formPayMethod').value = item.payMethod || '現金';
-                document.getElementById('formNote').value = item.note || '';
-            } else {
-                document.getElementById('expenseModalTitle').textContent = "新增支出 Add Expense";
-                form.reset();
-                document.getElementById('expenseId').value = '';
-                document.getElementById('formCurrency').value = currentCurrency;
-                document.getElementById('formDate').value = new Date().toISOString().slice(0, 10);
-                const defaultDay = typeof selectedDayFilter === 'number' ? selectedDayFilter : 1;
-                document.getElementById('formDayNum').value = defaultDay;
-            }
-
+            const modal = document.getElementById('budgetModal');
             modal.classList.remove('hidden');
             setTimeout(() => modal.classList.remove('opacity-0'), 10);
         }
 
-        function closeExpenseModal() {
-            const modal = document.getElementById('expenseModal');
+        function closeBudgetModal() {
+            const modal = document.getElementById('budgetModal');
             modal.classList.add('opacity-0');
             setTimeout(() => modal.classList.add('hidden'), 200);
         }
 
-        function saveExpense(e) {
+        function saveBudgetModal(e) {
             e.preventDefault();
-            const id = document.getElementById('expenseId').value;
-            const title = document.getElementById('formTitle').value.trim();
-            const rawAmount = parseFloat(document.getElementById('formAmount').value) || 0;
-            const inputCurrency = document.getElementById('formCurrency').value;
-
-            // Normalize entered amount to base standard (HKD)
-            const amountInHKD = inputCurrency === 'CNY' ? rawAmount / CNY_EXCHANGE_RATE : rawAmount;
-
-            const category = document.getElementById('formCategory').value;
-            const dayNum = parseInt(document.getElementById('formDayNum').value);
-            const date = document.getElementById('formDate').value;
-            const payer = document.getElementById('formPaidBy').value;
-            const payMethod = document.getElementById('formPayMethod').value;
-            const note = document.getElementById('formNote').value.trim();
-
-            if (id) {
-                const index = expenses.findIndex(x => String(x.id) === String(id));
-                if (index !== -1) {
-                    expenses[index] = { id, title, amount: amountInHKD, category, dayNum, date, payer, payMethod, note };
-                }
+            const val = parseFloat(document.getElementById('quickBudgetInput').value);
+            if (!isNaN(val) && val > 0) {
+                // Store in HKD base currency
+                currentBudget = currentCurrency === 'CNY' ? val / CNY_EXCHANGE_RATE : val;
+                localStorage.setItem('travel_budget', currentBudget);
+                showToast("預算已更新！");
             } else {
-                expenses.push({
-                    id: "exp_" + Date.now(),
-                    title, amount: amountInHKD, category, dayNum, date, payer, payMethod, note
-                });
+                currentBudget = null;
+                localStorage.removeItem('travel_budget');
+                showToast("已清除預算設定");
             }
-
-            saveExpensesToStorage();
             renderDashboard();
-            renderExpenseList();
-            closeExpenseModal();
-            showToast(id ? "支出已更新" : "成功記錄支出");
+            closeBudgetModal();
         }
 
-        function editExpense(id) {
-            openExpenseModal(id);
+        function clearBudget() {
+            currentBudget = null;
+            localStorage.removeItem('travel_budget');
+            renderDashboard();
+            closeBudgetModal();
+            showToast("已清除預算設定");
         }
 
-        function deleteExpense(id) {
-            if (confirm("確定要刪除這筆支出紀錄嗎？")) {
-                expenses = expenses.filter(x => String(x.id) !== String(id));
-                saveExpensesToStorage();
-                renderDashboard();
-                renderExpenseList();
-                showToast("已刪除該筆支出");
+        function saveBudgetFromSettings() {
+            const val = parseFloat(document.getElementById('settingsBudgetInput').value);
+            if (!isNaN(val) && val > 0) {
+                currentBudget = currentCurrency === 'CNY' ? val / CNY_EXCHANGE_RATE : val;
+                localStorage.setItem('travel_budget', currentBudget);
+                showToast("預算設定已儲存");
+            } else {
+                currentBudget = null;
+                localStorage.removeItem('travel_budget');
+                showToast("已重置預算");
             }
-        }
-
-        // --- TRIP CONFIG MODAL LOGIC ---
-        function openTripModal() {
-            document.getElementById('tripStartDate').value = tripConfig.startDate;
-            document.getElementById('tripTotalDays').value = tripConfig.totalDays;
-            const modal = document.getElementById('tripModal');
-            modal.classList.remove('hidden');
-            setTimeout(() => modal.classList.remove('opacity-0'), 10);
-        }
-
-        function closeTripModal() {
-            const modal = document.getElementById('tripModal');
-            modal.classList.add('opacity-0');
-            setTimeout(() => modal.classList.add('hidden'), 200);
-        }
-
-        function saveTripConfig(e) {
-            e.preventDefault();
-            tripConfig.startDate = document.getElementById('tripStartDate').value;
-            tripConfig.totalDays = parseInt(document.getElementById('tripTotalDays').value) || 1;
-            localStorage.setItem('travel_trip_config', JSON.stringify(tripConfig));
-
-            renderDayFilterBar();
-            renderItinerary();
-            renderExpenseList();
-            closeTripModal();
-            showToast("出發日期與天數設定已更新");
+            renderDashboard();
         }
 
         // --- SETTINGS MODAL LOGIC ---
         function openSettingsModal() {
+            const settingsInput = document.getElementById('settingsBudgetInput');
+            if (settingsInput) {
+                settingsInput.value = currentBudget ? convertAmount(currentBudget).toFixed(0) : '';
+            }
             const modal = document.getElementById('settingsModal');
             modal.classList.remove('hidden');
             setTimeout(() => modal.classList.remove('opacity-0'), 10);
